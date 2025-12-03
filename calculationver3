@@ -87,3 +87,19 @@ if m.status == GRB.OPTIMAL:
     print(f"Daily deficit D: {D:.2f} kcal/day")
 else:
     print("Model not optimal, status =", m.status)
+
+
+Optimal monthly calories burned (COUT): 109170.40
+Monthly calorie intake M: 2889.01
+walk: 4.00 hours/month
+cycle: 52.00 hours/month
+swim: 4.00 hours/month
+run: 10.00 hours/month
+strength: 6.00 hours/month
+Daily calories intake CIN_d: 2889.01
+carbs  (g/day): 430.00
+protein(g/day): 90.00
+fat    (g/day): 81.00
+fiber  (g/day): 40.00
+other cals/day: 0.00
+Daily deficit D: -750.00 kcal/day
