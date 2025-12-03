@@ -1,0 +1,89 @@
+from gurobipy import Model, GRB
+
+M = 3654.0
+T_max = 180.0
+# Calories burnt baseline daily
+L = 2020
+
+cal_per_hour = {
+    'walk': 342.0,
+    'cycle': 722.8,
+    'swim': 542.2,
+    'run': 564.8,
+    'strength': 300.0
+}
+
+m = Model("fitness_plan")
+
+# H contains hours spent per activity
+# Ex: H[walk] = hours spent walking per month
+H = {}
+for act in cal_per_hour:
+    H[act] = m.addVar(lb=0.0, name=f"H_{act}")
+
+# Nutrient intake,
+N1 = m.addVar(lb=411.0, ub=594.0, name="carbs")      # carbs
+N2 = m.addVar(lb=90.0, ub = 120, name="protein")     # protein
+N3 = m.addVar(lb=81.0, ub=142.0, name="fat")         # fat
+N4 = m.addVar(lb=40.0, ub = 51, name="fiber")        # fiber
+N5 = m.addVar(lb=0.0, ub= 350, name="other_cals")    # other calories
+
+m.update()
+
+CIN_d = 4*N1 + 4*N2 + 9*N3 + 2*N4 + N5
+
+COUT = (
+    cal_per_hour['walk']    * H['walk'] +
+    cal_per_hour['cycle']   * H['cycle'] +
+    cal_per_hour['swim']    * H['swim'] +
+    cal_per_hour['run']     * H['run'] +
+    cal_per_hour['strength']* H['strength'] + 
+    L*30
+)
+
+m.setObjective(COUT, GRB.MAXIMIZE)
+
+m.addConstr(sum(H[a] for a in H) <= T_max, name="time_limit")
+m.addConstr(H['strength'] <= 6.0, name="min_strength_hours")
+m.addConstr(
+    H['walk'] + H['cycle'] + H['swim'] + H['run'] >= 7.5,
+    name="min_aerobic_hours"
+)
+
+m.addConstr(CIN_d <= M, name = "allowed caloric intake")
+m.addConstr(CIN_d - COUT/30.0 >= -750.0, name="deficit_low")
+m.addConstr(CIN_d - COUT/30.0 <= -500.0, name="deficit_high")
+
+#excercise time constraints
+m.addConstr(H['walk'] + H['cycle'] + H['swim'] <= 60, name = 'max_aerobic')
+m.addConstr(H['run'] <= 10, name = 'max_run')
+
+# Must try each normal excercise at least 4 hr per month, run and strength 2
+m.addConstr(H['walk'] >= 4)
+m.addConstr(H['swim'] >= 4)
+m.addConstr(H['cycle'] >= 4)
+m.addConstr(H['run'] >= 2)
+m.addConstr(H['strength'] >= 2)
+
+
+
+m.Params.OutputFlag = 0  
+m.optimize()
+
+if m.status == GRB.OPTIMAL:
+    print(f"Optimal monthly calories burned (COUT): {COUT.getValue():.2f}")
+    print(f"Monthly calorie intake M: {CIN_d.getValue():.2f}")
+    for a in H:
+        print(f"{a}: {H[a].X:.2f} hours/month")
+
+    print(f"Daily calories intake CIN_d: {CIN_d.getValue():.2f}")
+    print(f"carbs  (g/day): {N1.X:.2f}")
+    print(f"protein(g/day): {N2.X:.2f}")
+    print(f"fat    (g/day): {N3.X:.2f}")
+    print(f"fiber  (g/day): {N4.X:.2f}")
+    print(f"other cals/day: {N5.X:.2f}")
+
+    D = CIN_d.getValue() - COUT.getValue()/30.0
+    print(f"Daily deficit D: {D:.2f} kcal/day")
+else:
+    print("Model not optimal, status =", m.status)
